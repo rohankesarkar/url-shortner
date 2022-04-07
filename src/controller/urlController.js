@@ -7,16 +7,16 @@ const { promisify } = require("util");
 
 //Connect to redis
 const redisClient = redis.createClient(
-  16820,
-  "redis-16820.c80.us-east-1-2.ec2.cloud.redislabs.com",
-  { no_ready_check: true }
+    16820,
+    "redis-16820.c80.us-east-1-2.ec2.cloud.redislabs.com",
+    { no_ready_check: true }
 );
 redisClient.auth("OTnq8rY1owfTtCuQR8ZeVZiEDn5P0ra6", function (err) {
-  if (err) throw err;
+    if (err) throw err;
 });
 
 redisClient.on("connect", async function () {
-  console.log("Connected to Redis..");
+    console.log("Connected to Redis..");
 });
 
 
@@ -49,6 +49,17 @@ const createUrl = async function (req, res) {
         const longUrl = req.body.longUrl
         let body = req.body
         let query = req.query
+
+        let check = await GET_ASYNC(`${longUrl}`)
+        if (check) {
+            let responce = JSON.parse(check)
+            console.log("data is from cache")
+            return res.status(200).send(responce)
+        }
+
+
+
+       
 
         if (!isValidBody(body)) {
             return res.status(400).send({ status: false, msg: "Body Should not be empty" })
@@ -83,15 +94,16 @@ const createUrl = async function (req, res) {
         let longUrlExist = await urlModel.findOne({ longUrl: longUrl }).select({ longUrl: 1, shortUrl: 1, urlCode: 1, _id: 0 })
         if (longUrlExist) {
             await SET_ASYNC(`${longUrl}`, JSON.stringify(longUrlExist))
+            console.log("data is from db")
             return res.status(200).send({ status: true, msg: longUrlExist })
         } else {
             let savedData = await urlModel.create(data)
-            
+
             let response = await urlModel.findOne({ _id: savedData._id }).select({ longUrl: 1, shortUrl: 1, urlCode: 1, _id: 0 })
             return res.status(201).send({ status: true, msg: response })
 
         }
- } catch (err) {
+    } catch (err) {
         console.log("This is the error :", err.message)
         return res.status(500).send({ msg: "Error", error: err.message })
     }
@@ -111,20 +123,20 @@ const getUrl = async function (req, res) {
         if (isValidBody(req.query)) return res.status(400).send({ status: false, msg: "invalid parameters" })
 
         let check = await GET_ASYNC(`${urlCode}`)
-        if(check){
+        if (check) {
             let responce = JSON.parse(check)
             console.log("data is from cache")
             return res.status(302).redirect(responce.longUrl)
         }
 
-       let url = await urlModel.findOne({ urlCode: urlCode }).select({ longUrl: 1, _id: 0 })
+        let url = await urlModel.findOne({ urlCode: urlCode }).select({ longUrl: 1, _id: 0 })
         if (url) {
             await SET_ASYNC(`${urlCode}`, JSON.stringify(url))
             console.log('data is from mongodb')
             return res.status(302).redirect(url.longUrl)
 
-        }else{
-         return res.status(404).send({ status: false, msg: "urlcode does not exist" })
+        } else {
+            return res.status(404).send({ status: false, msg: "urlcode does not exist" })
         }
 
     } catch (err) {
